@@ -16,35 +16,31 @@
 // under the License.
 package org.apache.doris.flink.table;
 
+import org.apache.flink.api.common.io.RichOutputFormat;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.util.ExecutorThreadFactory;
+import org.apache.flink.table.data.GenericRowData;
+import org.apache.flink.table.data.RowData;
+
 import org.apache.doris.flink.cfg.DorisExecutionOptions;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.flink.cfg.DorisReadOptions;
 import org.apache.doris.flink.exception.DorisException;
 import org.apache.doris.flink.exception.StreamLoadException;
 import org.apache.doris.flink.rest.RestService;
-import org.apache.flink.api.common.io.RichOutputFormat;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.util.ExecutorThreadFactory;
-import org.apache.flink.table.data.GenericRowData;
-import org.apache.flink.table.data.RowData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.StringJoiner;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-
-/**
- * DorisDynamicOutputFormat
- **/
+/** DorisDynamicOutputFormat */
 public class DorisDynamicOutputFormat extends RichOutputFormat<RowData> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DorisDynamicOutputFormat.class);
@@ -61,7 +57,6 @@ public class DorisDynamicOutputFormat extends RichOutputFormat<RowData> {
     private DorisExecutionOptions executionOptions;
     private DorisStreamLoad dorisStreamLoad;
 
-
     private final List<String> batch = new ArrayList<>();
     private transient volatile boolean closed = false;
 
@@ -69,42 +64,67 @@ public class DorisDynamicOutputFormat extends RichOutputFormat<RowData> {
     private transient ScheduledFuture<?> scheduledFuture;
     private transient volatile Exception flushException;
 
-    public DorisDynamicOutputFormat(DorisOptions option, DorisReadOptions readOptions, DorisExecutionOptions executionOptions) {
+    public DorisDynamicOutputFormat(
+            DorisOptions option,
+            DorisReadOptions readOptions,
+            DorisExecutionOptions executionOptions) {
         this.options = option;
         this.readOptions = readOptions;
         this.executionOptions = executionOptions;
-        this.fieldDelimiter = executionOptions.getStreamLoadProp().getProperty(FIELD_DELIMITER_KEY, FIELD_DELIMITER_DEFAULT);
-        this.lineDelimiter = executionOptions.getStreamLoadProp().getProperty(LINE_DELIMITER_KEY, LINE_DELIMITER_DEFAULT);
+        this.fieldDelimiter =
+                DorisDelimiterParser.parse(
+                        executionOptions
+                                .getStreamLoadProp()
+                                .getProperty(FIELD_DELIMITER_KEY, FIELD_DELIMITER_DEFAULT),
+                        FIELD_DELIMITER_DEFAULT);
+        this.lineDelimiter =
+                DorisDelimiterParser.parse(
+                        executionOptions
+                                .getStreamLoadProp()
+                                .getProperty(FIELD_DELIMITER_KEY, FIELD_DELIMITER_DEFAULT),
+                        FIELD_DELIMITER_DEFAULT);
+        // this.fieldDelimiter =
+        // executionOptions.getStreamLoadProp().getProperty(FIELD_DELIMITER_KEY,
+        // FIELD_DELIMITER_DEFAULT);
+        // this.lineDelimiter = executionOptions.getStreamLoadProp().getProperty(LINE_DELIMITER_KEY,
+        // LINE_DELIMITER_DEFAULT);
     }
 
     @Override
-    public void configure(Configuration configuration) {
-    }
+    public void configure(Configuration configuration) {}
 
     @Override
     public void open(int taskNumber, int numTasks) throws IOException {
-        dorisStreamLoad = new DorisStreamLoad(
-                getBackend(),
-                options.getTableIdentifier().split("\\.")[0],
-                options.getTableIdentifier().split("\\.")[1],
-                options.getUsername(),
-                options.getPassword(),
-                executionOptions.getStreamLoadProp());
+        dorisStreamLoad =
+                new DorisStreamLoad(
+                        getBackend(),
+                        options.getTableIdentifier().split("\\.")[0],
+                        options.getTableIdentifier().split("\\.")[1],
+                        options.getUsername(),
+                        options.getPassword(),
+                        executionOptions.getStreamLoadProp());
         LOG.info("Streamload BE:{}", dorisStreamLoad.getLoadUrlStr());
 
         if (executionOptions.getBatchIntervalMs() != 0 && executionOptions.getBatchSize() != 1) {
-            this.scheduler = Executors.newScheduledThreadPool(1, new ExecutorThreadFactory("doris-streamload-output-format"));
-            this.scheduledFuture = this.scheduler.scheduleWithFixedDelay(() -> {
-                synchronized (DorisDynamicOutputFormat.this) {
-                    if (!closed) {
-                        try {
-                            flush();
-                        } catch (Exception e) {
-                            flushException = e;
-                        }
-                    }
-                }
-            }, executionOptions.getBatchIntervalMs(), executionOptions.getBatchIntervalMs(), TimeUnit.MILLISECONDS);
+            this.scheduler =
+                    Executors.newScheduledThreadPool(
+                            1, new ExecutorThreadFactory("doris-streamload-output-format"));
+            this.scheduledFuture =
+                    this.scheduler.scheduleWithFixedDelay(
+                            () -> {
+                                synchronized (DorisDynamicOutputFormat.this) {
+                                    if (!closed) {
+                                        try {
+                                            flush();
+                                        } catch (Exception e) {
+                                            flushException = e;
+                                        }
+                                    }
+                                }
+                            },
+                            executionOptions.getBatchIntervalMs(),
+                            executionOptions.getBatchIntervalMs(),
+                            TimeUnit.MILLISECONDS);
         }
     }
 
@@ -119,7 +139,8 @@ public class DorisDynamicOutputFormat extends RichOutputFormat<RowData> {
         checkFlushException();
 
         addBatch(row);
-        if (executionOptions.getBatchSize() > 0 && batch.size() >= executionOptions.getBatchSize()) {
+        if (executionOptions.getBatchSize() > 0
+                && batch.size() >= executionOptions.getBatchSize()) {
             flush();
         }
     }
@@ -179,23 +200,22 @@ public class DorisDynamicOutputFormat extends RichOutputFormat<RowData> {
                     Thread.sleep(1000 * i);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
-                    throw new IOException("unable to flush; interrupted while doing another attempt", e);
+                    throw new IOException(
+                            "unable to flush; interrupted while doing another attempt", e);
                 }
             }
         }
     }
 
-
     private String getBackend() throws IOException {
         try {
-            //get be url from fe
+            // get be url from fe
             return RestService.randomBackend(options, readOptions, LOG);
         } catch (IOException | DorisException e) {
             LOG.error("get backends info fail");
             throw new IOException(e);
         }
     }
-
 
     /**
      * A builder used to set parameters to the output format's configuration in a fluent way.
@@ -206,9 +226,7 @@ public class DorisDynamicOutputFormat extends RichOutputFormat<RowData> {
         return new Builder();
     }
 
-    /**
-     * Builder for {@link DorisDynamicOutputFormat}.
-     */
+    /** Builder for {@link DorisDynamicOutputFormat}. */
     public static class Builder {
         private DorisOptions.Builder optionsBuilder;
         private DorisReadOptions readOptions;
@@ -250,8 +268,7 @@ public class DorisDynamicOutputFormat extends RichOutputFormat<RowData> {
 
         public DorisDynamicOutputFormat build() {
             return new DorisDynamicOutputFormat(
-                    optionsBuilder.build(), readOptions, executionOptions
-            );
+                    optionsBuilder.build(), readOptions, executionOptions);
         }
     }
 }

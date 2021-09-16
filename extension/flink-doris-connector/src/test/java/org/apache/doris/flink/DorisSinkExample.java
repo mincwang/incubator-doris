@@ -34,22 +34,25 @@ public class DorisSinkExample {
         final StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         List<Tuple2<String, Integer>> data = new ArrayList<>();
-        data.add(new Tuple2<>("doris",1));
+        data.add(new Tuple2<>("doris", 1));
+        data.add(new Tuple2<>("flink", 2));
         DataStreamSource<Tuple2<String, Integer>> source = env.fromCollection(data);
-        tEnv.createTemporaryView("doris_test",source,$("name"),$("age"));
+        tEnv.createTemporaryView("doris_test", source, $("name"), $("age"));
 
         tEnv.executeSql(
-                "CREATE TABLE doris_test_sink (" +
-                        "name STRING," +
-                        "age INT" +
-                        ") " +
-                        "WITH (\n" +
-                        "  'connector' = 'doris',\n" +
-                        "  'fenodes' = 'FE_IP:8030',\n" +
-                        "  'table.identifier' = 'db.table',\n" +
-                        "  'username' = 'root',\n" +
-                        "  'password' = ''\n" +
-                        ")");
+                "CREATE TABLE doris_test_sink ("
+                        + "name STRING,"
+                        + "age INT"
+                        + ") "
+                        + "WITH (\n"
+                        + "  'connector' = 'doris',\n"
+                        + "  'fenodes' = 'n3:8031',\n"
+                        + "  'table.identifier' = 'erp_dev.student',\n"
+                        + "  'sink.properties.column_separator' = '\\x01',\n"
+                        + "  'sink.properties.line_delimiter' = '\\x02',\n"
+                        + "  'username' = 'root',\n"
+                        + "  'password' = 'doris'\n"
+                        + ")");
 
         tEnv.executeSql("INSERT INTO doris_test_sink select name,age from doris_test");
     }
