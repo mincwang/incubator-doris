@@ -47,9 +47,9 @@ public class DorisSinkExample {
                         + "WITH (\n"
                         + "  'connector' = 'doris',\n"
                         + "  'fenodes' = 'n3:8031',\n"
-                        + "  'table.identifier' = 'erp_dev.student',\n"
-                        + "  'sink.properties.column_separator' = '\\x01',\n"
-                        + "  'sink.properties.line_delimiter' = '\\x02',\n"
+                        + "  'table.identifier' = 'erp_dev.student_unique',\n"
+//                        + "  'sink.properties.column_separator' ='\\t',\n"
+//                        + "  'sink.properties.line_delimiter' = '\\n',\n"
                         + "  'username' = 'root',\n"
                         + "  'password' = 'doris'\n"
                         + ")");

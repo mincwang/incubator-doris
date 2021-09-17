@@ -36,21 +36,19 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
-/**
- * DorisStreamLoad
- **/
+/** DorisStreamLoad */
 public class DorisStreamLoad implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DorisStreamLoad.class);
 
-    private final static List<String> DORIS_SUCCESS_STATUS = new ArrayList<>(Arrays.asList("Success", "Publish Timeout"));
+    private static final List<String> DORIS_SUCCESS_STATUS =
+            new ArrayList<>(Arrays.asList("Success", "Publish Timeout"));
     private static String loadUrlPattern = "http://%s/api/%s/%s/_stream_load?";
     private String user;
     private String passwd;
@@ -61,14 +59,24 @@ public class DorisStreamLoad implements Serializable {
     private String authEncoding;
     private Properties streamLoadProp;
 
-    public DorisStreamLoad(String hostPort, String db, String tbl, String user, String passwd, Properties streamLoadProp) {
+    public DorisStreamLoad(
+            String hostPort,
+            String db,
+            String tbl,
+            String user,
+            String passwd,
+            Properties streamLoadProp) {
         this.hostPort = hostPort;
         this.db = db;
         this.tbl = tbl;
         this.user = user;
         this.passwd = passwd;
         this.loadUrlStr = String.format(loadUrlPattern, hostPort, db, tbl);
-        this.authEncoding = Base64.getEncoder().encodeToString(String.format("%s:%s", user, passwd).getBytes(StandardCharsets.UTF_8));
+        this.authEncoding =
+                Base64.getEncoder()
+                        .encodeToString(
+                                String.format("%s:%s", user, passwd)
+                                        .getBytes(StandardCharsets.UTF_8));
         this.streamLoadProp = streamLoadProp;
     }
 
@@ -85,20 +93,26 @@ public class DorisStreamLoad implements Serializable {
         this.loadUrlStr = String.format(loadUrlPattern, hostPort, this.db, this.tbl);
     }
 
-
     private HttpURLConnection getConnection(String urlStr, String label) throws IOException {
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setInstanceFollowRedirects(false);
         conn.setRequestMethod("PUT");
-        String authEncoding = Base64.getEncoder().encodeToString(String.format("%s:%s", user, passwd).getBytes(StandardCharsets.UTF_8));
+        String authEncoding =
+                Base64.getEncoder()
+                        .encodeToString(
+                                String.format("%s:%s", user, passwd)
+                                        .getBytes(StandardCharsets.UTF_8));
         conn.setRequestProperty("Authorization", "Basic " + authEncoding);
         conn.addRequestProperty("Expect", "100-continue");
         conn.addRequestProperty("Content-Type", "text/plain; charset=UTF-8");
         conn.addRequestProperty("label", label);
         for (Map.Entry<Object, Object> entry : streamLoadProp.entrySet()) {
-            conn.addRequestProperty(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+            conn.addRequestProperty(
+                    String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
         }
+        // conn.addRequestProperty("column_separator", DorisDelimiterParser.parse("%","\\t"));
+        // conn.addRequestProperty("line_delimiter", DorisDelimiterParser.parse("$", "\\n"));
         conn.setDoOutput(true);
         conn.setDoInput(true);
         return conn;
@@ -133,7 +147,8 @@ public class DorisStreamLoad implements Serializable {
         } else {
             ObjectMapper obj = new ObjectMapper();
             try {
-                RespContent respContent = obj.readValue(loadResponse.respContent, RespContent.class);
+                RespContent respContent =
+                        obj.readValue(loadResponse.respContent, RespContent.class);
                 if (!DORIS_SUCCESS_STATUS.contains(respContent.getStatus())) {
                     throw new StreamLoadException("stream load error: " + respContent.getMessage());
                 }
@@ -148,8 +163,10 @@ public class DorisStreamLoad implements Serializable {
         if (StringUtils.isBlank(label)) {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
             String formatDate = sdf.format(new Date());
-            label = String.format("flink_connector_%s_%s",formatDate,
-                    UUID.randomUUID().toString().replaceAll("-", ""));
+            label =
+                    String.format(
+                            "flink_connector_%s_%s",
+                            formatDate, UUID.randomUUID().toString().replaceAll("-", ""));
         }
 
         HttpURLConnection feConn = null;
@@ -172,7 +189,8 @@ public class DorisStreamLoad implements Serializable {
             while ((line = br.readLine()) != null) {
                 response.append(line);
             }
-//            log.info("AuditLoader plugin load with label: {}, response code: {}, msg: {}, content: {}",label, status, respMsg, response.toString());
+            //            log.info("AuditLoader plugin load with label: {}, response code: {}, msg:
+            // {}, content: {}",label, status, respMsg, response.toString());
             return new LoadResponse(status, respMsg, response.toString());
 
         } catch (Exception e) {

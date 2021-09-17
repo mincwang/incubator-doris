@@ -81,8 +81,8 @@ public class DorisDynamicOutputFormat extends RichOutputFormat<RowData> {
                 DorisDelimiterParser.parse(
                         executionOptions
                                 .getStreamLoadProp()
-                                .getProperty(FIELD_DELIMITER_KEY, FIELD_DELIMITER_DEFAULT),
-                        FIELD_DELIMITER_DEFAULT);
+                                .getProperty(LINE_DELIMITER_KEY, LINE_DELIMITER_DEFAULT),
+                        LINE_DELIMITER_DEFAULT);
         // this.fieldDelimiter =
         // executionOptions.getStreamLoadProp().getProperty(FIELD_DELIMITER_KEY,
         // FIELD_DELIMITER_DEFAULT);
